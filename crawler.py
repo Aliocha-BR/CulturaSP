@@ -38,6 +38,22 @@ QUERIES = [
     f"Ballet Clássico São Petersburgo São Paulo {ANO}",
     f"Balé da Cidade São Paulo temporada {ANO}",
 
+    # — Teatro clássico ocidental: por autor —
+    f"Shakespeare São Paulo em cartaz {MES} {ANO}",
+    f"Molière Tchekhov Ibsen Strindberg peça teatro São Paulo {ANO}",
+    f"Dostoiévski Kafka Beckett Brecht teatro São Paulo {ANO}",
+
+    # — Teatro brasileiro clássico: por autor —
+    f"Nelson Rodrigues peça teatro São Paulo em cartaz {ANO}",
+    f"Ariano Suassuna peça teatro São Paulo {ANO}",
+    f"Nelson Rodrigues Ariano Suassuna Machado de Assis adaptação teatro São Paulo {ANO}",
+
+    # — Por casa de teatro —
+    f"Teatro FAAP programação peças {MES} {ANO}",
+    f"Teatro Santander São Paulo programação {MES} {ANO}",
+    f"Teatro das Artes São Paulo peças clássicas {MES} {ANO}",
+    f"Theatro São Pedro programação peças {MES} {ANO}",
+
     # — Concertos e recitais: mês corrente —
     f"OSESP concertos Sala São Paulo {MES}",
     f"concerto sinfônico recital piano violino São Paulo {MES}",
@@ -56,10 +72,10 @@ QUERIES = [
     # — Infantil: mês corrente —
     f"Tiquequê Palavra Cantada agenda shows São Paulo {MES}",
 
-    # — Livros: trimestre atual —
+    # — Livros: ano atual —
     f"É Realizações Cultor de Livros Quadrante lançamentos {ANO}",
 
-    # — Sympla/ticketing para capturar eventos não divulgados nos sites oficiais —
+    # — Ticketing para capturar eventos não divulgados nos sites oficiais —
     f"site:sympla.com.br ópera ballet clássico São Paulo {ANO}",
     f"site:uhuu.com ballet ópera São Paulo {ANO}",
 ]
@@ -140,9 +156,13 @@ CURATE_PROMPT = """Avalie este item cultural.
 APROVAR: ópera do repertório lírico tradicional (Wagner, Verdi, Puccini, Mozart,
 Rossini, Offenbach, Giordano, Strauss, Prokofiev, Stravinsky etc), ballet clássico
 (Lago dos Cisnes, Giselle, Quebra-Nozes, Dom Quixote, Bela Adormecida etc),
-concerto/recital sinfônico ou de câmara com repertório clássico, teatro de texto
-canônico (Shakespeare, Molière, Tchekhov, Ibsen), infantil de qualidade reconhecida
-(Tiquequê, Palavra Cantada), exposição de grandes mestres ou acervo clássico,
+concerto/recital sinfônico ou de câmara com repertório clássico,
+teatro de texto canônico ocidental (Shakespeare, Molière, Tchekhov, Ibsen,
+Strindberg, Dostoiévski, Brecht, Beckett, Wilde, Racine, Corneille) OU teatro
+brasileiro clássico de qualidade (Nelson Rodrigues, Ariano Suassuna, Jorge Andrade,
+Machado de Assis adaptado),
+infantil de qualidade reconhecida (Tiquequê, Palavra Cantada),
+exposição de grandes mestres ou acervo clássico,
 filme clássico ou de diretor consagrado, livro de filosofia/teologia/história/
 literatura clássica.
 
