@@ -1,7 +1,7 @@
 """
 CulturaSP — Crawler de Elevada Cultura
 Usa Claude com web_search nativo para encontrar e curar eventos em SP.
-Só precisa da chave Anthropic — sem dependências externas de busca.
+Busca a temporada ANUAL completa para capturar óperas e ballets com antecedência.
 """
 
 import json
@@ -18,29 +18,69 @@ DATA_DIR.mkdir(exist_ok=True)
 
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
-NOW = datetime.now()
-MES = NOW.strftime("%B %Y")
+NOW  = datetime.now()
+MES  = NOW.strftime("%B %Y")   # mês atual ex: "maio 2026"
+ANO  = NOW.strftime("%Y")      # ano ex: "2026"
+
+# ---------------------------------------------------------------------------
+# Queries — mix de temporada anual (ópera/ballet) + mês corrente (concertos/expo)
+# ---------------------------------------------------------------------------
 
 QUERIES = [
-    f"Theatro Municipal São Paulo programação ópera {MES}",
+    # — Ópera: temporada anual completa —
+    f"temporada ópera São Paulo {ANO} Theatro Municipal programação completa",
+    f"temporada ópera São Paulo {ANO} Theatro São Pedro programação completa",
+    f"ópera São Paulo {ANO} ingressos datas Teatro Bradesco Cultura Artística",
+
+    # — Ballet: temporada anual completa —
+    f"ballet clássico São Paulo {ANO} temporada completa Lago dos Cisnes Giselle Quebra-Nozes",
+    f"Moscow City Ballet São Paulo {ANO}",
+    f"Ballet Clássico São Petersburgo São Paulo {ANO}",
+    f"Balé da Cidade São Paulo temporada {ANO}",
+
+    # — Concertos e recitais: mês corrente —
     f"OSESP concertos Sala São Paulo {MES}",
+    f"concerto sinfônico recital piano violino São Paulo {MES}",
     f"Cultura Artística São Paulo programação {MES}",
-    f"Theatro São Pedro São Paulo programação {MES}",
-    f"ópera ballet concerto sinfônico São Paulo {MES}",
-    f"Tiquequê Palavra Cantada agenda shows {MES}",
+    f"SESC São Paulo concerto música clássica câmara {MES}",
+
+    # — Exposições: mês corrente —
     f"MASP Pinacoteca IMS exposições em cartaz {MES}",
     f"Japan House São Paulo exposição {MES}",
-    f"Espaço Itaú CineSesc cinema clássico arte São Paulo {MES}",
-    f"É Realizações Cultor Quadrante lançamentos livros {MES}",
+    f"SESC São Paulo exposição arte fotografia {MES}",
+
+    # — Cinema de arte: mês corrente —
+    f"Espaço Itaú CineSesc cinema clássico arte retrospectiva São Paulo {MES}",
+    f"SESC São Paulo cinema clássico arte {MES}",
+
+    # — Infantil: mês corrente —
+    f"Tiquequê Palavra Cantada agenda shows São Paulo {MES}",
+
+    # — Livros: trimestre atual —
+    f"É Realizações Cultor de Livros Quadrante lançamentos {ANO}",
+
+    # — Sympla/ticketing para capturar eventos não divulgados nos sites oficiais —
+    f"site:sympla.com.br ópera ballet clássico São Paulo {ANO}",
+    f"site:uhuu.com ballet ópera São Paulo {ANO}",
 ]
 
-EXTRACT_SYSTEM = "Você extrai eventos culturais de resultados de busca. Retorne APENAS array JSON válido. Nenhum texto fora do JSON."
+# ---------------------------------------------------------------------------
+# Busca + extração via Anthropic web_search
+# ---------------------------------------------------------------------------
 
-EXTRACT_PROMPT = """A partir dos resultados de busca abaixo, extraia todos os eventos,
-exposições, filmes ou livros culturais em São Paulo ({mes}).
+EXTRACT_SYSTEM = (
+    "Você extrai eventos culturais de resultados de busca. "
+    "Retorne APENAS array JSON válido. Nenhum texto fora do JSON."
+)
+
+EXTRACT_PROMPT = """Extraia todos os eventos, exposições, filmes ou livros culturais
+em São Paulo mencionados abaixo. Inclua eventos futuros de {ano}, mesmo que ainda
+não seja o mês deles — especialmente óperas e ballets que esgotam rápido.
 
 Para cada item retorne:
-{{"title":"nome","description":"descrição","date":"data/período","venue":"local","price":"preço se mencionado","url":"URL mais relevante","category":"evento|exposição|filme|livro","source":"instituição"}}
+{{"title":"nome","description":"descrição","date":"data ou período completo",
+"venue":"local/teatro","price":"preço se mencionado","url":"URL mais relevante",
+"category":"evento|exposição|filme|livro","source":"instituição"}}
 
 Se não encontrar nada claro, retorne [].
 
@@ -48,39 +88,36 @@ Resultados:
 {results}"""
 
 def search_and_extract(query: str) -> list:
-    """Usa Claude com web_search para buscar e extrair eventos."""
     try:
-        # Passo 1: busca na web via Anthropic
-        search_response = client.messages.create(
+        # Busca na web via Anthropic
+        search_resp = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
+            max_tokens=3000,
             tools=[{"type": "web_search_20250305", "name": "web_search"}],
-            messages=[{"role": "user", "content": f"Busque informações sobre: {query}"}],
+            messages=[{"role": "user", "content": f"Busque: {query}"}],
         )
 
-        # Extrai o texto dos resultados
+        # Coleta todo o texto retornado
         results_text = ""
-        for block in search_response.content:
-            if hasattr(block, "type") and block.type == "text":
+        for block in search_resp.content:
+            if hasattr(block, "text"):
                 results_text += block.text + "\n"
-            elif hasattr(block, "type") and block.type == "tool_result":
-                results_text += str(block.content) + "\n"
 
         if not results_text.strip():
             return []
 
-        # Passo 2: extrai eventos estruturados
-        extract_response = client.messages.create(
+        # Extrai eventos estruturados
+        extract_resp = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=2048,
+            max_tokens=3000,
             system=EXTRACT_SYSTEM,
             messages=[{
                 "role": "user",
-                "content": EXTRACT_PROMPT.format(mes=MES, results=results_text[:6000])
+                "content": EXTRACT_PROMPT.format(ano=ANO, results=results_text[:8000])
             }],
         )
 
-        raw = extract_response.content[0].text.strip()
+        raw = extract_resp.content[0].text.strip()
         raw = re.sub(r"^```json\s*|\s*```$", "", raw)
         items = json.loads(raw)
         return items if isinstance(items, list) else []
@@ -89,26 +126,46 @@ def search_and_extract(query: str) -> list:
         print(f"   ⚠️  Erro: {e}")
         return []
 
+# ---------------------------------------------------------------------------
+# Curadoria
+# ---------------------------------------------------------------------------
 
-CURATE_SYSTEM = "Você é um curador de alta cultura clássico e conservador. Retorne APENAS objeto JSON válido."
+CURATE_SYSTEM = (
+    "Você é um curador de alta cultura clássico e conservador. "
+    "Retorne APENAS objeto JSON válido."
+)
 
 CURATE_PROMPT = """Avalie este item cultural.
 
-APROVAR: ópera, ballet clássico, concerto/recital clássico, teatro de texto canônico
-(Shakespeare, Molière, Tchekhov, Ibsen), infantil de qualidade (Tiquequê, Palavra Cantada),
-exposição de grandes mestres/acervo clássico, filme clássico ou de autor consagrado,
-livro de filosofia/teologia/história/literatura clássica.
+APROVAR: ópera do repertório lírico tradicional (Wagner, Verdi, Puccini, Mozart,
+Rossini, Offenbach, Giordano, Strauss, Prokofiev, Stravinsky etc), ballet clássico
+(Lago dos Cisnes, Giselle, Quebra-Nozes, Dom Quixote, Bela Adormecida etc),
+concerto/recital sinfônico ou de câmara com repertório clássico, teatro de texto
+canônico (Shakespeare, Molière, Tchekhov, Ibsen), infantil de qualidade reconhecida
+(Tiquequê, Palavra Cantada), exposição de grandes mestres ou acervo clássico,
+filme clássico ou de diretor consagrado, livro de filosofia/teologia/história/
+literatura clássica.
 
-REJEITAR: tema identitário (gênero, raça como protagonismo político, LGBT), subversão,
-transgressão, "decolonial", dança contemporânea, performance, instalação conceitual,
-linguagem ativista ("corpos dissidentes", "narrativas apagadas", "colonialidade").
+REJEITAR: tema identitário (gênero, raça como protagonismo político, LGBT),
+subversão, transgressão, "decolonial", dança contemporânea, performance,
+instalação conceitual, linguagem ativista ("corpos dissidentes", "narrativas
+apagadas", "colonialidade", "escrevivência", "resistência").
 
-Para ópera/teatro: julgue pela OBRA, não pela direção cênica. Wagner/Verdi/Mozart = APROVAR.
+Para ópera/teatro: julgue pela OBRA (compositor/autor), não pela direção cênica.
+Wagner/Verdi/Mozart/Offenbach/Strauss = APROVAR independente de quem dirige.
+Ópera com tema político explícito (campo de concentração, militância) = REJEITAR.
+
 NA DÚVIDA: REJEITAR.
 
 Item: {item_json}
 
-Retorne: {{"approved":true/false,"score":1-10,"category_label":"Ópera|Ballet|Orquestra|Recital|Teatro|Infantil|Exposição|Cinema|Livro","curator_note":"até 15 palavras"}}"""
+Retorne:
+{{"approved":true/false,"score":1-10,
+"category_label":"Ópera|Ballet|Orquestra|Recital|Teatro|Infantil|Exposição|Cinema|Livro",
+"curator_note":"justificativa em até 15 palavras",
+"urgency":"alta|normal"}}
+
+urgency=alta se o evento esgota rápido (ópera, ballet internacional, recital único)."""
 
 def curate_item(item: dict):
     try:
@@ -127,31 +184,36 @@ def curate_item(item: dict):
         print(f"   ⚠️  Curadoria erro: {e}")
         return None
 
+# ---------------------------------------------------------------------------
+# Pipeline
+# ---------------------------------------------------------------------------
 
 def run():
     print("=" * 60)
-    print(f"  CULTURA SP — {NOW.strftime('%d/%m/%Y %H:%M')} — {MES}")
+    print(f"  CULTURA SP — {NOW.strftime('%d/%m/%Y %H:%M')}")
+    print(f"  Buscando temporada {ANO} + eventos de {MES}")
     print("=" * 60)
 
     all_raw = []
     for query in QUERIES:
-        print(f"\n🔍 {query[:65]}...")
+        print(f"\n🔍 {query[:70]}...")
         items = search_and_extract(query)
         print(f"   {len(items)} item(ns)")
         all_raw.extend(items)
         time.sleep(1)
 
-    # Dedup
+    # Dedup por título + data
     seen, deduped = set(), []
     for item in all_raw:
         key = re.sub(r"\s+", " ", item.get("title", "").lower().strip())[:60]
-        fk = f"{key}|{str(item.get('date',''))[:15]}"
+        fk  = f"{key}|{str(item.get('date', ''))[:20]}"
         if key and fk not in seen:
             seen.add(fk)
             deduped.append(item)
 
     print(f"\n📦 Total: {len(all_raw)} | Dedup: {len(deduped)}")
 
+    # Curadoria
     print(f"\n🎭 Curando {len(deduped)} itens...")
     curated = []
     for i, item in enumerate(deduped, 1):
@@ -159,15 +221,21 @@ def run():
         result = curate_item(item)
         if result:
             curated.append(result)
-            print(f"✅ ({result.get('category_label','')} · {result.get('score','')})")
+            urgency = "🔴" if result.get("urgency") == "alta" else ""
+            print(f"✅ {urgency}({result.get('category_label','')} · {result.get('score','')})")
         else:
             print("❌")
         time.sleep(0.3)
 
     print(f"\n✨ Aprovados: {len(curated)} de {len(deduped)}")
 
-    ORDER = {"evento": 0, "exposição": 1, "filme": 2, "livro": 3}
-    curated.sort(key=lambda e: (ORDER.get(e.get("category", "evento"), 9), e.get("date", "")))
+    # Ordena: urgência alta primeiro, depois por categoria e data
+    def sort_key(e):
+        urgency_order = 0 if e.get("urgency") == "alta" else 1
+        cat_order = {"evento": 0, "exposição": 1, "filme": 2, "livro": 3}
+        return (urgency_order, cat_order.get(e.get("category", "evento"), 9), e.get("date", ""))
+
+    curated.sort(key=sort_key)
 
     out = {"updated_at": NOW.isoformat(), "total": len(curated), "events": curated}
     out_path = DATA_DIR / "events.js"
@@ -176,7 +244,6 @@ def run():
         encoding="utf-8"
     )
     print(f"\n💾 Salvo em {out_path}\n")
-
 
 if __name__ == "__main__":
     run()

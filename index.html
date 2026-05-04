@@ -202,6 +202,18 @@
       margin-bottom: 0.25rem;
     }
 
+    .urgency-badge {
+      display: inline-block;
+      background: var(--red);
+      color: #fff;
+      font-family: "Cinzel", serif;
+      font-size: 0.55rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.15rem 0.45rem;
+      margin-bottom: 0.4rem;
+    }
+
     .card-date {
       font-family: 'EB Garamond', serif;
       font-style: italic;
@@ -501,6 +513,7 @@
               <div class="score-dots">${dots(e.score || 0)}</div>
             </div>
             <h3>${e.title || "Sem título"}</h3>
+            ${e.urgency === "alta" ? "<div class=\"urgency-badge\">⚡ Esgota rápido</div>" : ""}
             <div class="card-date">${e.date || ""}</div>
             <div class="card-venue">${e.venue || e.source || ""}</div>
           </div>
