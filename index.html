@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Cultura SP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,900;1,400;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Cinzel:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #f5f0e8;
+      --parchment: #ede5d0;
+      --ink: #1a1510;
+      --ink-soft: #3d3326;
+      --ink-faint: #7a6e5e;
+      --gold: #8b6914;
+      --gold-light: #c9a84c;
+      --red: #8b1a1a;
+      --rule: #c5b89a;
+      --card-bg: #faf7f2;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--cream);
+      color: var(--ink);
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 17px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--ink);
+      color: var(--cream);
+      text-align: center;
+      padding: 2rem 1.5rem 1.5rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 3px solid var(--gold);
+    }
+
+    .masthead-rule {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-bottom: 0.5rem;
+    }
+    .masthead-rule span {
+      font-family: 'Cinzel', serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      color: var(--gold-light);
+      text-transform: uppercase;
+    }
+    .masthead-line {
+      flex: 1;
+      height: 1px;
+      background: var(--gold);
+      max-width: 60px;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(2rem, 8vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--cream);
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--gold-light);
+    }
+
+    .tagline {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 0.95rem;
+      color: var(--rule);
+      margin-top: 0.4rem;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── FILTROS ── */
+    .filter-bar {
+      background: var(--parchment);
+      border-bottom: 1px solid var(--rule);
+      padding: 0.75rem 1rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .filter-bar::-webkit-scrollbar { display: none; }
+
+    .filter-btn {
+      white-space: nowrap;
+      border: 1px solid var(--rule);
+      background: transparent;
+      color: var(--ink-soft);
+      font-family: 'Cinzel', serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      padding: 0.4rem 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+    .filter-btn:hover { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+    .filter-btn.active { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
+
+    /* ── GRID ── */
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 4rem;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 2rem 0 1rem;
+    }
+    .section-head h2 {
+      font-family: 'Cinzel', serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--gold);
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .section-head hr {
+      flex: 1;
+      border: none;
+      border-top: 1px solid var(--rule);
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--rule);
+      border-top: 3px solid var(--ink);
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: box-shadow 0.2s, transform 0.15s;
+      position: relative;
+    }
+    .card:hover {
+      box-shadow: 4px 4px 0 var(--ink);
+      transform: translate(-2px, -2px);
+    }
+    .card:active { transform: translate(0, 0); box-shadow: none; }
+
+    .card-body {
+      padding: 1rem 1.1rem 0.9rem;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.4rem;
+    }
+    .cat-tag {
+      font-family: 'Cinzel', serif;
+      font-size: 0.58rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--red);
+      border: 1px solid var(--red);
+      padding: 0.1rem 0.4rem;
+    }
+    .score-dots {
+      display: flex;
+      gap: 2px;
+      align-items: center;
+    }
+    .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--rule);
+    }
+    .dot.filled { background: var(--gold); }
+
+    .card h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      line-height: 1.3;
+      color: var(--ink);
+      margin-bottom: 0.25rem;
+    }
+
+    .card-date {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 0.88rem;
+      color: var(--ink-faint);
+    }
+    .card-venue {
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      margin-top: 0.1rem;
+    }
+
+    .card-footer {
+      border-top: 1px solid var(--parchment);
+      padding: 0.5rem 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-price {
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      font-style: italic;
+    }
+    .card-arrow {
+      color: var(--gold);
+      font-size: 1.1rem;
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(26,21,16,0.75);
+      z-index: 200;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0;
+    }
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--card-bg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 88vh;
+      overflow-y: auto;
+      border-top: 4px solid var(--gold);
+      animation: slideUp 0.25s ease-out;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(40px); opacity: 0; }
+      to   { transform: translateY(0);   opacity: 1; }
+    }
+
+    .modal-header {
+      background: var(--ink);
+      color: var(--cream);
+      padding: 1.25rem 1.25rem 1rem;
+      position: sticky;
+      top: 0;
+    }
+    .modal-header .cat-tag { border-color: var(--gold-light); color: var(--gold-light); margin-bottom: 0.5rem; display: inline-block; }
+    .modal-header h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.2rem, 5vw, 1.6rem);
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--cream);
+    }
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      color: var(--rule);
+      font-size: 1.4rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0.25rem;
+    }
+
+    .modal-body { padding: 1.25rem; }
+
+    .modal-info-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      margin-bottom: 0.6rem;
+      font-size: 0.95rem;
+    }
+    .modal-info-row .icon {
+      width: 1.2em;
+      text-align: center;
+      flex-shrink: 0;
+      color: var(--gold);
+      margin-top: 0.05em;
+    }
+
+    .modal-desc {
+      margin: 1rem 0;
+      border-left: 2px solid var(--gold);
+      padding-left: 1rem;
+      font-style: italic;
+      color: var(--ink-soft);
+      line-height: 1.65;
+    }
+
+    .score-bar-label {
+      font-family: 'Cinzel', serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 0.35rem;
+    }
+    .score-bar-track {
+      height: 4px;
+      background: var(--parchment);
+      border-radius: 2px;
+      margin-bottom: 1.25rem;
+    }
+    .score-bar-fill {
+      height: 100%;
+      background: var(--gold);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    .curator-note {
+      background: var(--parchment);
+      border: 1px solid var(--rule);
+      padding: 0.75rem 1rem;
+      font-style: italic;
+      font-size: 0.9rem;
+      color: var(--ink-soft);
+      margin-bottom: 1.25rem;
+    }
+    .curator-note strong {
+      font-style: normal;
+      font-family: 'Cinzel', serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--gold);
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+
+    .modal-cta {
+      display: block;
+      background: var(--ink);
+      color: var(--gold-light);
+      text-decoration: none;
+      text-align: center;
+      font-family: 'Cinzel', serif;
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 1rem;
+      border: 2px solid var(--ink);
+      transition: all 0.2s;
+    }
+    .modal-cta:hover { background: transparent; color: var(--ink); }
+
+    /* ── EMPTY / FOOTER ── */
+    .empty {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+    .empty strong {
+      display: block;
+      font-family: 'Cinzel', serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      color: var(--rule);
+      margin-bottom: 0.5rem;
+      font-style: normal;
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.78rem;
+      color: var(--ink-faint);
+      font-style: italic;
+      border-top: 1px solid var(--rule);
+    }
+
+    @media (min-width: 600px) {
+      .modal { border-radius: 4px 4px 0 0; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="masthead-rule">
+    <div class="masthead-line"></div>
+    <span>São Paulo</span>
+    <div class="masthead-line"></div>
+  </div>
+  <h1>Cultura <em>SP</em></h1>
+  <p class="tagline">Ópera · Música Clássica · Teatro · Ballet · Exposições · Livros</p>
+</header>
+
+<div class="filter-bar" id="filterBar">
+  <button class="filter-btn active" data-cat="Todos">Todos</button>
+  <button class="filter-btn" data-cat="Ópera">Ópera</button>
+  <button class="filter-btn" data-cat="Orquestra">Orquestra</button>
+  <button class="filter-btn" data-cat="Recital">Recital</button>
+  <button class="filter-btn" data-cat="Ballet">Ballet</button>
+  <button class="filter-btn" data-cat="Teatro">Teatro</button>
+  <button class="filter-btn" data-cat="Infantil">Infantil</button>
+  <button class="filter-btn" data-cat="Exposição">Exposição</button>
+  <button class="filter-btn" data-cat="Cinema">Cinema</button>
+  <button class="filter-btn" data-cat="Livro">Livro</button>
+</div>
+
+<main id="main">
+  <div class="empty">
+    <strong>Aguardando curadoria</strong>
+    Execute o crawler para carregar os eventos.
+  </div>
+</main>
+
+<footer id="footer"></footer>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+      <div class="cat-tag" id="mCat"></div>
+      <h2 id="mTitle"></h2>
+    </div>
+    <div class="modal-body">
+      <div class="score-bar-label">Curadoria</div>
+      <div class="score-bar-track"><div class="score-bar-fill" id="mBar"></div></div>
+      <div class="modal-info-row"><span class="icon">📅</span><span id="mDate"></span></div>
+      <div class="modal-info-row"><span class="icon">📍</span><span id="mVenue"></span></div>
+      <div class="modal-info-row"><span class="icon">🎟</span><span id="mPrice"></span></div>
+      <div class="modal-desc" id="mDesc"></div>
+      <div class="curator-note" id="mNote"><strong>Nota do curador</strong><span id="mNoteText"></span></div>
+      <a class="modal-cta" id="mCta" href="#" target="_blank" rel="noopener">Informações e ingressos →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CAT_ORDER = ["Ópera","Ballet","Orquestra","Recital","Teatro","Infantil","Exposição","Cinema","Livro"];
+  let activeFilter = "Todos";
+  let allEvents = [];
+
+  function dots(score) {
+    let h = "";
+    for (let i = 1; i <= 10; i++)
+      h += `<div class="dot${i <= score ? " filled" : ""}"></div>`;
+    return h;
+  }
+
+  function render() {
+    const main = document.getElementById("main");
+    const filtered = activeFilter === "Todos"
+      ? allEvents
+      : allEvents.filter(e => e.category_label === activeFilter);
+
+    if (!filtered.length) {
+      main.innerHTML = `<div class="empty"><strong>Nenhum evento</strong>Nenhum item nesta categoria no momento.</div>`;
+      return;
+    }
+
+    // Agrupa por categoria
+    const groups = {};
+    CAT_ORDER.forEach(c => groups[c] = []);
+    filtered.forEach(e => {
+      const c = e.category_label || "Outros";
+      if (!groups[c]) groups[c] = [];
+      groups[c].push(e);
+    });
+
+    let html = "";
+    CAT_ORDER.forEach(cat => {
+      if (!groups[cat] || !groups[cat].length) return;
+      html += `<div class="section-head"><h2>${cat}</h2><hr></div>`;
+      groups[cat].forEach((e, i) => {
+        const idx = allEvents.indexOf(e);
+        html += `
+        <div class="card" onclick="openModal(${idx})">
+          <div class="card-body">
+            <div class="card-meta">
+              <span class="cat-tag">${e.category_label || ""}</span>
+              <div class="score-dots">${dots(e.score || 0)}</div>
+            </div>
+            <h3>${e.title || "Sem título"}</h3>
+            <div class="card-date">${e.date || ""}</div>
+            <div class="card-venue">${e.venue || e.source || ""}</div>
+          </div>
+          <div class="card-footer">
+            <span class="card-price">${e.price || ""}</span>
+            <span class="card-arrow">→</span>
+          </div>
+        </div>`;
+      });
+    });
+
+    main.innerHTML = html;
+  }
+
+  function openModal(idx) {
+    const e = allEvents[idx];
+    document.getElementById("mCat").textContent = e.category_label || "";
+    document.getElementById("mTitle").textContent = e.title || "";
+    document.getElementById("mDate").textContent = e.date || "Data a confirmar";
+    document.getElementById("mVenue").textContent = e.venue || e.source || "";
+    document.getElementById("mPrice").textContent = e.price || "Consultar";
+    document.getElementById("mDesc").textContent = e.description || "";
+    document.getElementById("mNoteText").textContent = e.curator_note || "";
+    document.getElementById("mBar").style.width = ((e.score || 0) * 10) + "%";
+    const cta = document.getElementById("mCta");
+    cta.href = e.url || "#";
+    cta.textContent = e.category_label === "Livro" ? "Ver livro →" : "Informações e ingressos →";
+    document.getElementById("overlay").classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeModal(evt) {
+    if (evt.target === document.getElementById("overlay")) closeModalDirect();
+  }
+  function closeModalDirect() {
+    document.getElementById("overlay").classList.remove("open");
+    document.body.style.overflow = "";
+  }
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModalDirect(); });
+
+  // Filtros
+  document.getElementById("filterBar").addEventListener("click", e => {
+    const btn = e.target.closest(".filter-btn");
+    if (!btn) return;
+    document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeFilter = btn.dataset.cat;
+    render();
+  });
+
+  // Carrega dados
+  function load() {
+    if (typeof window.CULTURA_EVENTS === "undefined" || !window.CULTURA_EVENTS.events) return;
+    const data = window.CULTURA_EVENTS;
+    allEvents = data.events || [];
+
+    const footer = document.getElementById("footer");
+    if (data.updated_at) {
+      const d = new Date(data.updated_at);
+      footer.textContent = `Curadoria atualizada em ${d.toLocaleDateString("pt-BR", {day:"2-digit",month:"long",year:"numeric"})} · ${allEvents.length} eventos selecionados`;
+    }
+    render();
+  }
+
+  // Aguarda o script de dados
+  if (document.readyState === "complete") load();
+  else window.addEventListener("load", load);
+</script>
+
+<script src="data/events.js"></script>
+</body>
+</html>
