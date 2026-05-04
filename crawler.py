@@ -1,19 +1,18 @@
 """
 CulturaSP — Crawler de Elevada Cultura
-Coleta eventos de São Paulo capital: ópera, teatro clássico, orquestra,
-ballet, infantil de qualidade, exposições, filmes de arte e livros de
-editoras conservadoras.
+Usa Google Custom Search + Claude para encontrar e curar eventos em SP.
+Não depende de scraping direto — funciona no GitHub Actions.
 """
 
 import json
+import os
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import anthropic
 import requests
-from bs4 import BeautifulSoup
 
 # ---------------------------------------------------------------------------
 # Configuração
@@ -22,398 +21,181 @@ from bs4 import BeautifulSoup
 DATA_DIR = Path(__file__).parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "pt-BR,pt;q=0.9",
-}
+ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GOOGLE_KEY    = os.environ.get("GOOGLE_API_KEY", "")
+GOOGLE_CX     = os.environ.get("GOOGLE_CX", "")
 
-client = anthropic.Anthropic()
+client = anthropic.Anthropic(api_key=ANTHROPIC_KEY)
 
-# ---------------------------------------------------------------------------
-# Fontes
-# ---------------------------------------------------------------------------
+NOW   = datetime.now()
+MES   = NOW.strftime("%B %Y")
 
-SOURCES = [
-    # — Eventos ao vivo —
-    {
-        "name": "Theatro Municipal",
-        "url": "https://www.theatromunicipal.org.br/programacao/",
-        "category": "evento",
-        "hint": "ópera, ballet, orquestra, recitais",
-    },
-    {
-        "name": "OSESP",
-        "url": "https://osesp.art.br/osesp/concertos-ingressos",
-        "category": "evento",
-        "hint": "concertos sinfônicos, câmara, recitais",
-    },
-    {
-        "name": "Sala São Paulo",
-        "url": "https://www.salasaopaulo.art.br/programacao/",
-        "category": "evento",
-        "hint": "concertos, recitais, câmara",
-    },
-    {
-        "name": "Cultura Artística",
-        "url": "https://www.culturaartistica.com.br/programacao",
-        "category": "evento",
-        "hint": "grandes nomes da música clássica, ópera, recitais internacionais",
-    },
-    {
-        "name": "Theatro São Pedro",
-        "url": "https://www.theatrosaopedro.org.br/programacao",
-        "category": "evento",
-        "hint": "ópera, teatro clássico, música",
-    },
-    {
-        "name": "Tiquequê",
-        "url": "https://www.tiqueteke.com.br/agenda",
-        "category": "evento",
-        "hint": "espetáculos musicais infantis de qualidade",
-    },
-    {
-        "name": "Palavra Cantada",
-        "url": "https://www.palavracantada.com.br/agenda",
-        "category": "evento",
-        "hint": "música infantil de qualidade, shows educativos",
-    },
-    # — Exposições —
-    {
-        "name": "MASP",
-        "url": "https://masp.org.br/exposicoes",
-        "category": "exposição",
-        "hint": "exposições de arte — incluir acervo clássico e grandes mestres; rejeitar temáticas identitárias",
-    },
-    {
-        "name": "Pinacoteca",
-        "url": "https://pinacoteca.org.br/programacao/",
-        "category": "exposição",
-        "hint": "arte brasileira clássica e moderna",
-    },
-    {
-        "name": "IMS São Paulo",
-        "url": "https://ims.com.br/programacao/",
-        "category": "exposição",
-        "hint": "fotografia, artes visuais de alto nível",
-    },
-    {
-        "name": "MIS",
-        "url": "https://www.mis-sp.org.br/programacao",
-        "category": "exposição",
-        "hint": "cinema, fotografia, artes audiovisuais",
-    },
-    # — Filmes —
-    {
-        "name": "Espaço Itaú de Cinema",
-        "url": "https://www.itaucinemas.com.br/espaco-itau",
-        "category": "filme",
-        "hint": "cinema de arte, clássicos, retrospectivas, filmes de autor",
-    },
-    {
-        "name": "CineSesc",
-        "url": "https://www.sescsp.org.br/programacao/cinema/",
-        "category": "filme",
-        "hint": "cinema de arte, clássicos, ciclos temáticos, retrospectivas",
-    },
-    # — Livros —
-    {
-        "name": "É Realizações",
-        "url": "https://erealizacoes.com.br/lancamentos/",
-        "category": "livro",
-        "hint": "filosofia, teologia, história, pensamento clássico e conservador",
-    },
-    {
-        "name": "Cultor de Livros",
-        "url": "https://www.cultordelivros.com.br/lancamentos",
-        "category": "livro",
-        "hint": "filosofia clássica, espiritualidade, cultura ocidental",
-    },
-    {
-        "name": "Quadrante",
-        "url": "https://www.quadrante.com.br/novidades",
-        "category": "livro",
-        "hint": "teologia, filosofia escolástica, espiritualidade católica",
-    },
+QUERIES = [
+    f"Theatro Municipal São Paulo programação ópera {MES}",
+    f"OSESP concertos Sala São Paulo {MES}",
+    f"Cultura Artística São Paulo programação {MES}",
+    f"Theatro São Pedro São Paulo programação {MES}",
+    f"ópera ballet São Paulo {MES} ingressos",
+    f"concerto sinfônico São Paulo {MES}",
+    f"recital piano violino São Paulo {MES}",
+    f"Tiquequê agenda shows {MES}",
+    f"Palavra Cantada agenda {MES}",
+    f"MASP exposições em cartaz {MES}",
+    f"Pinacoteca São Paulo exposições {MES}",
+    f"IMS São Paulo exposição {MES}",
+    f"Japan House São Paulo exposição {MES}",
+    f"Espaço Itaú cinema clássicos retrô São Paulo {MES}",
+    f"CineSesc filmes arte clássicos {MES}",
+    f"É Realizações lançamentos livros {MES}",
+    f"Cultor de Livros lançamentos {MES}",
+    f"Quadrante Editora lançamentos {MES}",
 ]
 
 # ---------------------------------------------------------------------------
-# Coleta de HTML
+# Google Custom Search
 # ---------------------------------------------------------------------------
 
-def fetch_text(url: str, max_chars: int = 40_000) -> str:
-    """Baixa a página e retorna texto limpo (sem tags, scripts, estilos)."""
+def google_search(query: str, num: int = 5) -> list:
+    if not GOOGLE_KEY or not GOOGLE_CX:
+        return []
+    url = "https://www.googleapis.com/customsearch/v1"
+    params = {"key": GOOGLE_KEY, "cx": GOOGLE_CX, "q": query, "num": num, "lr": "lang_pt", "gl": "br"}
     try:
-        resp = requests.get(url, headers=HEADERS, timeout=20)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for tag in soup(["script", "style", "noscript", "header", "footer", "nav"]):
-            tag.decompose()
-        text = soup.get_text(separator="\n")
-        # Compacta linhas em branco
-        text = re.sub(r"\n{3,}", "\n\n", text).strip()
-        return text[:max_chars]
+        r = requests.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        items = r.json().get("items", [])
+        return [{"title": i.get("title",""), "snippet": i.get("snippet",""), "url": i.get("link","")} for i in items]
     except Exception as e:
-        return f"ERRO: {e}"
+        print(f"   ⚠️  Google erro: {e}")
+        return []
 
 # ---------------------------------------------------------------------------
 # Extração com IA
 # ---------------------------------------------------------------------------
 
-EXTRACT_SYSTEM = """Você extrai informações de eventos, exposições, filmes ou livros
-a partir de texto bruto de páginas web. Retorne APENAS um array JSON válido.
-Nenhum texto fora do JSON. Nenhum markdown. Nenhum comentário."""
+EXTRACT_SYSTEM = "Você extrai eventos culturais de resultados de busca. Retorne APENAS array JSON válido."
 
-def extract_items(source: dict, page_text: str) -> list[dict]:
-    """Usa Claude Haiku para extrair itens estruturados da página."""
-
-    if page_text.startswith("ERRO:"):
+def extract_from_snippets(snippets: list) -> list:
+    if not snippets:
         return []
+    snippets_text = "\n\n".join([f"Título: {s['title']}\nURL: {s['url']}\nTrecho: {s['snippet']}" for s in snippets])
+    prompt = f"""Extraia eventos, exposições, filmes ou livros culturais em São Paulo ({MES}).
 
-    category = source["category"]
-    hint = source["hint"]
-    source_name = source["name"]
+Para cada item retorne:
+{{"title":"nome","description":"descrição","date":"data/período","venue":"local","price":"preço","url":"URL","category":"evento|exposição|filme|livro","source":"instituição"}}
 
-    if category == "livro":
-        schema = """{
-  "title": "Título do livro",
-  "author": "Autor",
-  "description": "Sinopse ou descrição breve",
-  "publisher": "Editora",
-  "date": "Data de lançamento se disponível",
-  "price": "Preço se disponível",
-  "url": "URL de compra se disponível",
-  "category": "livro"
-}"""
-        instruction = (
-            f"Extraia livros lançados nos últimos 3 meses do site '{source_name}'. "
-            f"Contexto: {hint}. "
-            "Retorne array JSON com os campos acima. Array vazio [] se não encontrar nada."
-        )
-    elif category == "filme":
-        schema = """{
-  "title": "Título do filme",
-  "director": "Diretor se mencionado",
-  "description": "Sinopse ou descrição",
-  "date": "Datas/horários de exibição",
-  "venue": "Nome do cinema/sala",
-  "price": "Preço se disponível",
-  "url": "Link para ingresso/informação",
-  "category": "filme"
-}"""
-        instruction = (
-            f"Extraia filmes em cartaz do site '{source_name}'. "
-            f"Contexto: {hint}. "
-            "Retorne array JSON com os campos acima. Array vazio [] se não encontrar nada."
-        )
-    elif category == "exposição":
-        schema = """{
-  "title": "Título da exposição",
-  "artist": "Artista(s) ou curador",
-  "description": "Descrição da exposição",
-  "date": "Período da exposição (datas de início e fim)",
-  "venue": "Nome do museu/espaço",
-  "price": "Preço se disponível",
-  "url": "Link para mais informações",
-  "category": "exposição"
-}"""
-        instruction = (
-            f"Extraia exposições em cartaz do site '{source_name}'. "
-            f"Contexto: {hint}. "
-            "Retorne array JSON com os campos acima. Array vazio [] se não encontrar nada."
-        )
-    else:  # evento ao vivo
-        schema = """{
-  "title": "Nome do espetáculo",
-  "description": "Descrição do evento",
-  "date": "Data e horário (cada apresentação separada)",
-  "venue": "Local/teatro",
-  "price": "Preço do ingresso se disponível",
-  "url": "Link para ingresso ou mais informações",
-  "category": "evento"
-}"""
-        instruction = (
-            f"Extraia eventos em cartaz do site '{source_name}'. "
-            f"Contexto: {hint}. "
-            "IMPORTANTE: cada apresentação em data diferente deve ser um item separado. "
-            "Retorne array JSON com os campos acima. Array vazio [] se não encontrar nada."
-        )
+Se não encontrar nada claro, retorne [].
 
-    prompt = f"{instruction}\n\nSchema de cada item:\n{schema}\n\nTexto da página:\n{page_text}"
-
+Resultados:
+{snippets_text}"""
     try:
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=4096,
+            model="claude-haiku-4-5-20251001", max_tokens=2048,
             system=EXTRACT_SYSTEM,
             messages=[{"role": "user", "content": prompt}],
         )
-        raw = msg.content[0].text.strip()
-        # Remove possíveis blocos markdown
-        raw = re.sub(r"^```json\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
+        raw = re.sub(r"^```json\s*|\s*```$", "", msg.content[0].text.strip())
         items = json.loads(raw)
-        if not isinstance(items, list):
-            return []
-        # Injeta fonte
-        for item in items:
-            item["source"] = source_name
-            if not item.get("venue") and category == "evento":
-                item["venue"] = source_name
-        return items
+        return items if isinstance(items, list) else []
     except Exception as e:
-        print(f"   ⚠️  Erro na extração IA: {e}")
+        print(f"   ⚠️  Extração erro: {e}")
         return []
 
 # ---------------------------------------------------------------------------
-# Curadoria com IA
+# Curadoria
 # ---------------------------------------------------------------------------
 
-CURATE_SYSTEM = """Você é um curador de alta cultura com gosto clássico e conservador.
-Avalie o item e retorne APENAS um objeto JSON válido. Nenhum texto fora do JSON."""
+CURATE_SYSTEM = "Você é um curador de alta cultura clássico e conservador. Retorne APENAS objeto JSON válido."
 
-CURATE_PROMPT = """Avalie este item cultural segundo os critérios abaixo.
+CURATE_PROMPT = """Avalie este item cultural.
 
-=== CRITÉRIOS DE APROVAÇÃO ===
-APROVAR se for:
-- Ópera (qualquer título do repertório lírico)
-- Ballet clássico (repertório tradicional: Lago dos Cisnes, Giselle, etc.)
-- Concerto sinfônico, de câmara ou recital (piano, cordas, voz)
-- Teatro de texto clássico (Shakespeare, Molière, Tchekhov, Ibsen, Sófocles,
-  Eurípides, Schiller e outros do cânone ocidental)
-- Espetáculo infantil musical de qualidade reconhecida (Tiquequê, Palavra Cantada)
-- Exposição de acervo clássico, grandes mestres ou fotografia de alto nível artístico
-- Filme clássico, de diretor consagrado, retrospectiva ou cinema de arte
-- Livro de filosofia clássica, teologia, história, literatura canônica ou
-  pensamento conservador publicado nos últimos 3 meses
+APROVAR: ópera, ballet clássico, concerto/recital clássico, teatro de texto canônico
+(Shakespeare, Molière, Tchekhov, Ibsen), infantil de qualidade (Tiquequê, Palavra Cantada),
+exposição de grandes mestres/acervo clássico, filme clássico ou de autor consagrado,
+livro de filosofia/teologia/história/literatura clássica.
 
-=== CRITÉRIOS DE REJEIÇÃO ===
-REJEITAR se houver qualquer sinal de:
-- Tema central identitário (gênero, raça como protagonismo político, LGBT)
-- Proposta de subversão, transgressão, desconstrução ou "resistência"
-- Teatro experimental sem texto canônico
-- Dança contemporânea, performance, instalação conceitual
-- Linguagem ativista: "decolonial", "corpos dissidentes", "narrativas apagadas",
-  "lugar de fala", "representatividade", "vozes silenciadas"
-- Arte cujo objetivo principal é provocar, chocar ou questionar valores tradicionais
+REJEITAR: tema identitário (gênero, raça como protagonismo político, LGBT), subversão,
+transgressão, "decolonial", dança contemporânea, performance, instalação conceitual,
+linguagem ativista ("corpos dissidentes", "narrativas apagadas", "colonialidade").
 
-IMPORTANTE: para óperas e peças de teatro, julgue pela OBRA (compositor, título, repertório),
-não pela direção cênica. Uma montagem contemporânea de Wagner, Verdi, Mozart ou Puccini
-deve ser APROVADA. Só rejeite se a própria obra for de vanguarda política.
-
+Para ópera/teatro: julgue pela OBRA, não pela direção cênica. Wagner/Verdi/Mozart = APROVAR.
 NA DÚVIDA: REJEITAR.
 
-=== ITEM A AVALIAR ===
-{item_json}
+Item: {item_json}
 
-=== RETORNE ESTE JSON ===
-{{
-  "approved": true ou false,
-  "score": número de 1 a 10 (qualidade cultural estimada),
-  "category_label": "Ópera" | "Ballet" | "Orquestra" | "Recital" | "Teatro" |
-                    "Infantil" | "Exposição" | "Cinema" | "Livro",
-  "curator_note": "frase curta justificando a decisão (máx 15 palavras)"
-}}"""
+Retorne: {{"approved":true/false,"score":1-10,"category_label":"Ópera|Ballet|Orquestra|Recital|Teatro|Infantil|Exposição|Cinema|Livro","curator_note":"até 15 palavras"}}"""
 
-
-def curate_item(item: dict) -> dict | None:
-    """Avalia um item e retorna dict enriquecido ou None se rejeitado."""
-    prompt = CURATE_PROMPT.format(item_json=json.dumps(item, ensure_ascii=False))
+def curate_item(item: dict):
     try:
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=300,
+            model="claude-haiku-4-5-20251001", max_tokens=300,
             system=CURATE_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": CURATE_PROMPT.format(item_json=json.dumps(item, ensure_ascii=False))}],
         )
-        raw = msg.content[0].text.strip()
-        raw = re.sub(r"^```json\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
+        raw = re.sub(r"^```json\s*|\s*```$", "", msg.content[0].text.strip())
         result = json.loads(raw)
-        if not result.get("approved"):
-            return None
-        # Mescla avaliação com dados originais
-        return {**item, **result}
+        return {**item, **result} if result.get("approved") else None
     except Exception as e:
-        print(f"   ⚠️  Erro na curadoria: {e}")
+        print(f"   ⚠️  Curadoria erro: {e}")
         return None
 
 # ---------------------------------------------------------------------------
-# Pipeline principal
+# Pipeline
 # ---------------------------------------------------------------------------
 
 def run():
     print("=" * 60)
-    print("  CULTURA SP — Crawler de Elevada Cultura")
-    print(f"  {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    print(f"  CULTURA SP — {NOW.strftime('%d/%m/%Y %H:%M')} — {MES}")
     print("=" * 60)
 
+    if not GOOGLE_KEY or not GOOGLE_CX:
+        print("\n⚠️  GOOGLE_API_KEY ou GOOGLE_CX ausentes. Configure os secrets no GitHub.\n")
+
     all_raw = []
-
-    # 1. Coleta e extração
-    for source in SOURCES:
-        print(f"\n📡 {source['name']}...")
-        text = fetch_text(source["url"])
-        if text.startswith("ERRO:"):
-            print(f"   ⚠️  {text}")
+    for query in QUERIES:
+        print(f"\n🔍 {query[:65]}...")
+        snippets = google_search(query)
+        if not snippets:
+            print("   0 resultados")
             continue
-        items = extract_items(source, text)
-        print(f"   {len(items)} item(ns) extraído(s)")
+        items = extract_from_snippets(snippets)
+        print(f"   {len(items)} item(ns)")
         all_raw.extend(items)
-        time.sleep(0.5)
+        time.sleep(0.3)
 
-    # 2. Deduplicação por título normalizado
-    seen = set()
-    deduped = []
+    # Dedup
+    seen, deduped = set(), []
     for item in all_raw:
-        key = re.sub(r"\s+", " ", item.get("title", "").lower().strip())[:60]
-        date_key = item.get("date", "")[:20]
-        full_key = f"{key}|{date_key}"
-        if key and full_key not in seen:
-            seen.add(full_key)
+        key = re.sub(r"\s+", " ", item.get("title","").lower().strip())[:60]
+        fk = f"{key}|{str(item.get('date',''))[:15]}"
+        if key and fk not in seen:
+            seen.add(fk)
             deduped.append(item)
 
-    print(f"\n📦 Total bruto: {len(all_raw)} | Após dedup: {len(deduped)}")
+    print(f"\n📦 Total: {len(all_raw)} | Dedup: {len(deduped)}")
 
-    # 3. Curadoria
+    # Curadoria
     print(f"\n🎭 Curando {len(deduped)} itens...")
     curated = []
     for i, item in enumerate(deduped, 1):
-        preview = item.get("title", "")[:50]
-        print(f"  [{i:2d}/{len(deduped)}] {preview}...", end=" ", flush=True)
+        print(f"  [{i:2d}/{len(deduped)}] {item.get('title','')[:50]}...", end=" ", flush=True)
         result = curate_item(item)
         if result:
             curated.append(result)
-            print(f"✅ ({result.get('category_label', '')} • {result.get('score', '')})")
+            print(f"✅ ({result.get('category_label','')} · {result.get('score','')})")
         else:
             print("❌")
         time.sleep(0.2)
 
     print(f"\n✨ Aprovados: {len(curated)} de {len(deduped)}")
 
-    # 4. Ordena: eventos primeiro por data, depois exposições, filmes, livros
-    def sort_key(item):
-        order = {"evento": 0, "exposição": 1, "filme": 2, "livro": 3}
-        cat = item.get("category", "evento")
-        return (order.get(cat, 9), item.get("date", ""))
+    ORDER = {"evento":0,"exposição":1,"filme":2,"livro":3}
+    curated.sort(key=lambda e: (ORDER.get(e.get("category","evento"),9), e.get("date","")))
 
-    curated.sort(key=sort_key)
-
-    # 5. Salva
-    output = {
-        "updated_at": datetime.now().isoformat(),
-        "total": len(curated),
-        "events": curated,
-    }
-    payload = json.dumps(output, ensure_ascii=False, indent=2)
+    out = {"updated_at": NOW.isoformat(), "total": len(curated), "events": curated}
     out_path = DATA_DIR / "events.js"
-    out_path.write_text(f"window.CULTURA_EVENTS = {payload};", encoding="utf-8")
-    print(f"\n💾 Salvo em {out_path}")
-    print("Abra index.html no navegador para ver os eventos!\n")
-
+    out_path.write_text(f"window.CULTURA_EVENTS = {json.dumps(out, ensure_ascii=False, indent=2)};", encoding="utf-8")
+    print(f"\n💾 Salvo em {out_path}\n")
 
 if __name__ == "__main__":
     run()
