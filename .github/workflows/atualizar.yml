@@ -24,6 +24,8 @@ jobs:
       - name: Rodar crawler
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_CX: ${{ secrets.GOOGLE_CX }}
         run: python crawler.py
 
       - name: Salvar eventos no repositório
