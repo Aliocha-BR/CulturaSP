@@ -1,0 +1,35 @@
+name: Atualizar Eventos
+
+on:
+  schedule:
+    - cron: "0 11 * * 1"
+  workflow_dispatch:
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: pip install anthropic requests beautifulsoup4
+
+      - name: Rodar crawler
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python crawler.py
+
+      - name: Salvar eventos no repositório
+        run: |
+          git config user.name "CulturaSP Bot"
+          git config user.email "bot@cultura-sp"
+          git add data/events.js
+          git diff --cached --quiet || git commit -m "Eventos atualizados — $(date '+%d/%m/%Y')"
+          git push
