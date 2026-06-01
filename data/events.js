@@ -1,5 +1,5 @@
 window.CULTURA_EVENTS = {
-  "updated_at": "2026-05-25T17:21:36.757676",
+  "updated_at": "2026-06-01T22:18:03.274058",
   "total": 0,
   "events": []
 };
